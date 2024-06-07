@@ -17,16 +17,17 @@ local ESP = {
     Overrides = {}
 }
 
---Declarations--
+-- Declarations --
 local cam = workspace.CurrentCamera
 local plrs = game:GetService("Players")
 local plr = plrs.LocalPlayer
 local mouse = plr:GetMouse()
+local UserInputService = game:GetService("UserInputService")
 
 local V3new = Vector3.new
 local WorldToViewportPoint = cam.WorldToViewportPoint
 
---Functions--
+-- Functions --
 local function Draw(obj, props)
     local new = Drawing.new(obj)
 
@@ -77,14 +78,14 @@ function ESP:Toggle(bool)
     self.Enabled = bool
     if not bool then
         for i,v in pairs(self.Objects) do
-            if v.Type == "Box" then --fov circle etc
+            if v.Type == "Box" then -- fov circle etc
                 if v.Temporary then
                     v:Remove()
-            else
-                for i,v in pairs(v.Components) do
-                    v.Visible = false
+                else
+                    for i,v in pairs(v.Components) do
+                        v.Visible = false
+                    end
                 end
-            end
             end
         end
     end
@@ -107,7 +108,7 @@ function ESP:AddObjectListener(parent, options)
                         IsEnabled = options.IsEnabled,
                         RenderInNil = options.RenderInNil
                     })
-                    --TODO: add a better way of passing options
+                    -- TODO: add a better way of passing options
                     if options.OnAdded then
                         coroutine.wrap(options.OnAdded)(box)
                     end
@@ -143,7 +144,6 @@ end
 
 function boxBase:Update()
     if not self.PrimaryPart then
-        --warn("not supposed to print", self.Object)
         return self:Remove()
     end
 
@@ -182,18 +182,18 @@ function boxBase:Update()
         color = ESP.HighlightColor
     end
 
-    --calculations--
+    -- Calculations --
     local cf = self.PrimaryPart.CFrame
     if ESP.FaceCamera then
         cf = CFrame.new(cf.p, cam.CFrame.p)
     end
     local size = self.Size
     local locs = {
-        TopLeft = cf * ESP.BoxShift * CFrame.new(size.X/2,size.Y/2,0),
-        TopRight = cf * ESP.BoxShift * CFrame.new(-size.X/2,size.Y/2,0),
-        BottomLeft = cf * ESP.BoxShift * CFrame.new(size.X/2,-size.Y/2,0),
-        BottomRight = cf * ESP.BoxShift * CFrame.new(-size.X/2,-size.Y/2,0),
-        TagPos = cf * ESP.BoxShift * CFrame.new(0,size.Y/2,0),
+        TopLeft = cf * ESP.BoxShift * CFrame.new(size.X/2, size.Y/2, 0),
+        TopRight = cf * ESP.BoxShift * CFrame.new(-size.X/2, size.Y/2, 0),
+        BottomLeft = cf * ESP.BoxShift * CFrame.new(size.X/2, -size.Y/2, 0),
+        BottomRight = cf * ESP.BoxShift * CFrame.new(-size.X/2, -size.Y/2, 0),
+        TagPos = cf * ESP.BoxShift * CFrame.new(0, size.Y/2, 0),
         Torso = cf * ESP.BoxShift
     }
 
@@ -230,7 +230,7 @@ function boxBase:Update()
 
             self.Components.Distance.Visible = true
             self.Components.Distance.Position = Vector2.new(TagPos.X, TagPos.Y + 14)
-            self.Components.Distance.Text = math.floor((cam.CFrame.p - cf.p).magnitude) .."m away"
+            self.Components.Distance.Text = math.floor((cam.CFrame.p - cf.p).magnitude) .. "m away"
             self.Components.Distance.Color = color
         else
             self.Components.Name.Visible = false
@@ -247,7 +247,7 @@ function boxBase:Update()
         if Vis6 then
             self.Components.Tracer.Visible = true
             self.Components.Tracer.From = Vector2.new(TorsoPos.X, TorsoPos.Y)
-            self.Components.Tracer.To = Vector2.new(cam.ViewportSize.X/2,cam.ViewportSize.Y/ESP.AttachShift)
+            self.Components.Tracer.To = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/ESP.AttachShift)
             self.Components.Tracer.Color = color
         else
             self.Components.Tracer.Visible = false
@@ -265,7 +265,7 @@ function ESP:Add(obj, options)
     local box = setmetatable({
         Name = options.Name or obj.Name,
         Type = "Box",
-        Color = options.Color --[[or self:GetColor(obj)]],
+        Color = options.Color,
         Size = options.Size or self.BoxSize,
         Object = obj,
         Player = options.Player or plrs:GetPlayerFromCharacter(obj),
@@ -377,6 +377,13 @@ game:GetService("RunService").RenderStepped:Connect(function()
             local s,e = pcall(v.Update, v)
             if not s then warn("[EU]", e, v.Object:GetFullName()) end
         end
+    end
+end)
+
+-- Right Shift Toggle --
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+        ESP:Toggle(not ESP.Enabled)
     end
 end)
 
