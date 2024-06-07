@@ -1,0 +1,149 @@
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+local localPlayer = players.LocalPlayer
+
+-- Create a table to store ESP elements for each player
+local espElements = {}
+
+local espVisible = true  -- Flag to track ESP visibility
+
+local function createESP(player)
+    if player == localPlayer then return end
+
+    local character = player.Character
+    if not character then return end
+
+    -- Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.Parent = character
+
+    -- BillboardGui for name and distance
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Adornee = character:FindFirstChild("HumanoidRootPart")
+    billboardGui.Size = UDim2.new(0, 200, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+    billboardGui.AlwaysOnTop = true
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Text = player.Name
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Parent = billboardGui
+
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    distanceLabel.BackgroundTransparency = 3
+    distanceLabel.Parent = billboardGui
+
+    billboardGui.Parent = character
+
+    -- Store ESP elements
+    espElements[player] = {
+        highlight = highlight,
+        billboardGui = billboardGui,
+        nameLabel = nameLabel,
+        distanceLabel = distanceLabel,
+    }
+
+    -- Tracer line
+    local tracerLine = Drawing.new("Line")
+    tracerLine.Color = Color3.new(1, 0, 0)
+    tracerLine.Thickness = 3
+    espElements[player].tracerLine = tracerLine
+
+    -- Box
+    local box = Drawing.new("Square")
+    box.Color = Color3.new(1, 0, 0)
+    box.Thickness = 3
+    box.Filled = false
+    espElements[player].box = box
+end
+
+local function updateESP()
+    for player, elements in pairs(espElements) do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
+            
+            -- Update distance label
+            local distance = (hrp.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+            elements.distanceLabel.Text = string.format("%.0f studs", distance)
+            
+            -- Update tracer line
+            elements.tracerLine.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y)
+            elements.tracerLine.To = Vector2.new(screenPos.X, screenPos.Y)
+            elements.tracerLine.Visible = onScreen and espVisible
+
+            -- Update box size based on distance
+            local boxBaseSize = Vector2.new(50, 80)  -- Base size for the box
+            local scaleFactor = math.clamp(50 / distance, 0.5, 5)  -- Scale factor based on distance
+            local boxSize = boxBaseSize * scaleFactor
+            elements.box.Position = Vector2.new(screenPos.X - boxSize.X / 2, screenPos.Y - boxSize.Y / 2)
+            elements.box.Size = boxSize
+            elements.box.Visible = onScreen and espVisible
+
+            -- Update highlight and billboard visibility
+            elements.highlight.Enabled = espVisible
+            elements.billboardGui.Enabled = espVisible
+        else
+            -- Cleanup if character is not valid
+            elements.highlight:Destroy()
+            elements.billboardGui:Destroy()
+            elements.tracerLine:Remove()
+            elements.box:Remove()
+            espElements[player] = nil
+        end
+    end
+end
+
+local function toggleESPVisibility()
+    espVisible = not espVisible
+end
+
+local function onCharacterAdded(character)
+    wait(0)  -- Give the character some time to load
+    createESP(players:GetPlayerFromCharacter(character))
+end
+
+local function onPlayerAdded(player)
+    if player.Character then
+        onCharacterAdded(player.Character)
+    end
+    player.CharacterAdded:Connect(onCharacterAdded)
+end
+
+local function onPlayerRemoving(player)
+    -- Cleanup ESP elements when player leaves
+    local elements = espElements[player]
+    if elements then
+        elements.highlight:Destroy()
+        elements.billboardGui:Destroy()
+        elements.tracerLine:Remove()
+        elements.box:Remove()
+        espElements[player] = nil
+    end
+end
+
+players.PlayerAdded:Connect(onPlayerAdded)
+players.PlayerRemoving:Connect(onPlayerRemoving)
+
+for _, player in pairs(players:GetPlayers()) do
+    if player ~= localPlayer then
+        onPlayerAdded(player)
+    end
+end
+
+runService.RenderStepped:Connect(updateESP)
+
+userInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.RightShift and not gameProcessed then
+        toggleESPVisibility()
+    end
+end)
